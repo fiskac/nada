@@ -1,0 +1,88 @@
+############################################################
+# Dockerfile to build Asterisk 13.21 Certified container image
+# Based on Centos7
+#
+# Build an image using the Dockerfile at current location
+# Example: docker build -t [name] .
+# docker build -t centos7asterisk13-21cert_v1 .   
+# docker run -it -p 5060:5060 -p 10000-20000:10000-20000/udp --name pbxV1 centos7asterisk13-21cert_v1 /bin/bash
+# docker run -it --name pbxV1 centos7asterisk13-21cert_v1 /bin/bash
+# https://hibou.io/blog/news-info-1/post/announcing-asterisk-docker-14
+############################################################
+
+
+# Set the base image to centos
+FROM centos
+
+# Update libraries
+RUN yum update -y
+
+# Install software to compile Asterisk
+RUN yum install automake bluez-libs-devel bzip2 corosynclib-devel gcc gcc-c++ git gsm-devel jansson-devel libcurl-devel libedit-devel libical-devel libogg-devel libsrtp-devel libtool-ltdl-devel libuuid-devel libvorbis-devel libxml2-devel libxslt-devel lua-devel mariadb-devel nano ncurses-devel neon-devel net-snmp-devel newt-devel openldap-devel openssl-devel perl popt-devel postgresql-devel speex-devel sqlite-devel subversion unixODBC-devel uuid-devel wget -y
+RUN yum clean all
+
+# Download Software
+WORKDIR /usr/src/
+RUN wget http://downloads.asterisk.org/pub/telephony/certified-asterisk/asterisk-certified-13.21-current.tar.gz
+RUN wget http://www.pjsip.org/release/2.4/pjproject-2.4.tar.bz2
+
+# Extract 
+RUN bzip2 -d pjproject-2.4.tar.bz2
+RUN tar xvf pjproject-2.4.tar
+RUN tar zxfv asterisk-certified-13.21-current.tar.gz
+
+# Clean
+#RUN rm asterisk-certified-13.21-current.tar.gz
+#RUN rm pjproject-2.4.tar
+
+# install pjproject-2.4
+WORKDIR /usr/src/pjproject-2.4
+
+# Optimize for 64bit version 
+RUN ./configure CFLAGS="-DNDEBUG -DPJ_HAS_IPV6=1" --prefix=/usr --libdir=/usr/lib64 --enable-shared --disable-video --disable-sound --disable-opencore-amr
+RUN make dep
+RUN make 
+RUN make install
+RUN ldconfig
+
+# Compile and Install Asterisk 
+WORKDIR /usr/src/asterisk-certified-13.21-cert3
+RUN ./bootstrap.sh
+RUN ./configure --libdir=/usr/lib64
+RUN make
+RUN make install
+RUN make samples
+RUN make config
+
+##########################
+#RUN service asterisk start
+#RUN asterisk -rvvv
+##########################
+
+##########################
+# For live computer Backup SELINUX config file
+#RUN cp /etc/selinux/config /etc/selinux/config.backup
+
+# Change SELINUX permission to start Asterisk  enforcing to permissive
+#RUN sed -i 's/enforcing/permissive/' /etc/selinux/config
+##########################
+
+
+
+# Docker Example codes
+# Usage: ADD [source directory or URL] [destination directory]
+#ADD /my_app_folder /my_app_folder
+
+# Usage: ENV key value
+#ENV SERVER_WORKS 4
+
+# Usage: EXPOSE [port]
+EXPOSE 5060
+
+# Usage: VOLUME ["/dir_1", "/dir_2" ..]
+#VOLUME ["/my_files"]
+
+
+
+
+
